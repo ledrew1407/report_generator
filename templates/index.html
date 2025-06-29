@@ -1,126 +1,116 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Inspection Report Generator</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <h1>Generate Inspection Report</h1>
+{% extends "base.html" %}
+{% block content %}
+    <h1>Generate Inspection Report</h1>
 
-        {% if error %}
-            <p class="error-message">{{ error }}</p>
-        {% endif %}
+    <form method="POST" action=""> {# Action is empty as POST is handled by the same route #}
+        {# This is for CSRF protection with Flask-WTF. It will generate a hidden input #}
+        {# that ensures the form submission is from your site. #}
+        {{ form_data.csrf_token if form_data.csrf_token }} 
 
-        <form method="POST" action="/">
-            <fieldset>
-                <legend>Report Title & Main Details</legend>
-                <div class="form-group">
-                    <label for="report_title">Report Main Title:</label>
-                    <input type="text" id="report_title" name="report_title" value="{{ form_data.report_title }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="inspector_name">Inspector Name:</label>
-                    <input type="text" id="inspector_name" name="inspector_name" value="{{ form_data.inspector_name }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="inspector_address">Inspector Address:</label>
-                    <textarea id="inspector_address" name="inspector_address" rows="3" required>{{ form_data.inspector_address }}</textarea>
-                </div>
-                <div class="form-group">
-                    <label for="adjuster_name">Adjuster Name:</label>
-                    <input type="text" id="adjuster_name" name="adjuster_name" value="{{ form_data.adjuster_name }}">
-                </div>
-                <div class="form-group">
-                    <label for="adjuster_number">Adjuster Number:</label>
-                    <input type="text" id="adjuster_number" name="adjuster_number" value="{{ form_data.adjuster_number }}">
-                </div>
-                <div class="form-group">
-                    <label for="adjuster_email">Adjuster Email:</label>
-                    <input type="email" id="adjuster_email" name="adjuster_email" value="{{ form_data.adjuster_email }}">
-                </div>
-                <div class="form-group">
-                    <label for="report_date">Report Date:</label>
-                    <input type="text" id="report_date" name="report_date" value="{{ form_data.report_date }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="claim_number">Claim Number:</label>
-                    <input type="text" id="claim_number" name="claim_number" value="{{ form_data.claim_number }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="year_built">Year Built:</label>
-                    <input type="text" id="year_built" name="year_built" value="{{ form_data.year_built }}" required>
-                </div>
-            </fieldset>
+        <fieldset>
+            <legend>Report Title & Main Details</legend>
+            <div class="form-group">
+                <label for="report_title">Report Main Title:</label>
+                <input type="text" id="report_title" name="report_title" value="{{ form_data.report_title }}" required>
+            </div>
+            <div class="form-group">
+                <label for="inspector_name">Inspector Name:</label>
+                <input type="text" id="inspector_name" name="inspector_name" value="{{ form_data.inspector_name }}" required>
+            </div>
+            <div class="form-group">
+                <label for="inspector_address">Inspector Address:</label>
+                <textarea id="inspector_address" name="inspector_address" rows="3" required>{{ form_data.inspector_address }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="adjuster_name">Adjuster Name:</label>
+                <input type="text" id="adjuster_name" name="adjuster_name" value="{{ form_data.adjuster_name }}">
+            </div>
+            <div class="form-group">
+                <label for="adjuster_number">Adjuster Number:</label>
+                <input type="text" id="adjuster_number" name="adjuster_number" value="{{ form_data.adjuster_number }}">
+            </div>
+            <div class="form-group">
+                <label for="adjuster_email">Adjuster Email:</label>
+                <input type="email" id="adjuster_email" name="adjuster_email" value="{{ form_data.adjuster_email }}">
+            </div>
+            <div class="form-group">
+                <label for="report_date">Report Date:</label>
+                <input type="text" id="report_date" name="report_date" value="{{ form_data.report_date }}" required>
+            </div>
+            <div class="form-group">
+                <label for="claim_number">Claim Number:</label>
+                <input type="text" id="claim_number" name="claim_number" value="{{ form_data.claim_number }}" required>
+            </div>
+            <div class="form-group">
+                <label for="year_built">Year Built:</label>
+                <input type="text" id="year_built" name="year_built" value="{{ form_data.year_built }}" required>
+            </div>
+        </fieldset>
 
-            <fieldset>
-                <legend>Loss Details</legend>
-                <div class="form-group">
-                    <label for="cause_of_loss_heading">Cause of Loss Heading:</label>
-                    <input type="text" id="cause_of_loss_heading" name="cause_of_loss_heading" value="{{ form_data.cause_of_loss_heading }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="cause_of_loss">Cause of Loss Content:</label>
-                    <textarea id="cause_of_loss" name="cause_of_loss" rows="5" required>{{ form_data.cause_of_loss }}</textarea>
-                </div>
-                <div class="form-group">
-                    <label for="resulting_damages_heading">Resulting Damages Heading:</label>
-                    <input type="text" id="resulting_damages_heading" name="resulting_damages_heading" value="{{ form_data.resulting_damages_heading }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="resulting_damages">Resulting Damages Content:</label>
-                    <textarea id="resulting_damages" name="resulting_damages" rows="7" required>{{ form_data.resulting_damages }}</textarea>
-                </div>
-            </fieldset>
+        <fieldset>
+            <legend>Loss Details</legend>
+            <div class="form-group">
+                <label for="cause_of_loss_heading">Cause of Loss Heading:</label>
+                <input type="text" id="cause_of_loss_heading" name="cause_of_loss_heading" value="{{ form_data.cause_of_loss_heading }}" required>
+            </div>
+            <div class="form-group">
+                <label for="cause_of_loss">Cause of Loss Content:</label>
+                <textarea id="cause_of_loss" name="cause_of_loss" rows="5" required>{{ form_data.cause_of_loss }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="resulting_damages_heading">Resulting Damages Heading:</label>
+                <input type="text" id="resulting_damages_heading" name="resulting_damages_heading" value="{{ form_data.resulting_damages_heading }}" required>
+            </div>
+            <div class="form-group">
+                <label for="resulting_damages">Resulting Damages Content:</label>
+                <textarea id="resulting_damages" name="resulting_damages" rows="7" required>{{ form_data.resulting_damages }}</textarea>
+            </div>
+        </fieldset>
 
-            <fieldset>
-                <legend>Scope & Recommendations</legend>
-                <div class="form-group">
-                    <label for="scope_of_work_heading">Scope of Work Heading:</label>
-                    <input type="text" id="scope_of_work_heading" name="scope_of_work_heading" value="{{ form_data.scope_of_work_heading }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="scope_of_work">Scope of Work Content (one item per line):</label>
-                    <textarea id="scope_of_work" name="scope_of_work" rows="7">{{ form_data.scope_of_work }}</textarea>
-                </div>
-                <div class="form-group">
-                    <label for="recommendations_heading">Recommendations Heading:</label>
-                    <input type="text" id="recommendations_heading" name="recommendations_heading" value="{{ form_data.recommendations_heading }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="recommendations">Recommendations Content (one item per line):</label>
-                    <textarea id="recommendations" name="recommendations" rows="5">{{ form_data.recommendations }}</textarea>
-                </div>
-            </fieldset>
+        <fieldset>
+            <legend>Scope & Recommendations</legend>
+            <div class="form-group">
+                <label for="scope_of_work_heading">Scope of Work Heading:</label>
+                <input type="text" id="scope_of_work_heading" name="scope_of_work_heading" value="{{ form_data.scope_of_work_heading }}" required>
+            </div>
+            <div class="form-group">
+                <label for="scope_of_work">Scope of Work Content (one item per line):</label>
+                <textarea id="scope_of_work" name="scope_of_work" rows="7">{{ form_data.scope_of_work }}</textarea>
+            </div>
+            <div class="form-group">
+                <label for="recommendations_heading">Recommendations Heading:</label>
+                <input type="text" id="recommendations_heading" name="recommendations_heading" value="{{ form_data.recommendations_heading }}" required>
+            </div>
+            <div class="form-group">
+                <label for="recommendations">Recommendations Content (one item per line):</label>
+                <textarea id="recommendations" name="recommendations" rows="5">{{ form_data.recommendations }}</textarea>
+            </div>
+        </fieldset>
 
-            <fieldset>
-                <legend>Estimated Reserves</legend>
-                <div class="form-group">
-                    <label for="reserves_heading">Reserves Section Heading:</label>
-                    <input type="text" id="reserves_heading" name="reserves_heading" value="{{ form_data.reserves_heading }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="reserves_input">Reserves Content (Category: Amount, one per line):</label>
-                    <textarea id="reserves_input" name="reserves_input" rows="7" placeholder="e.g.,&#10;Roof Repair: 15000.00&#10;Interior Painting: 500.00">{{ form_data.reserves_input }}</textarea>
-                </div>
-            </fieldset>
+        <fieldset>
+            <legend>Estimated Reserves</legend>
+            <div class="form-group">
+                <label for="reserves_heading">Reserves Section Heading:</label>
+                <input type="text" id="reserves_heading" name="reserves_heading" value="{{ form_data.reserves_heading }}" required>
+            </div>
+            <div class="form-group">
+                <label for="reserves_input">Reserves Content (Category: Amount, one per line):</label>
+                <textarea id="reserves_input" name="reserves_input" rows="7" placeholder="e.g.,&#10;Roof Repair: 15000.00&#10;Interior Painting: 500.00">{{ form_data.reserves_input }}</textarea>
+            </div>
+        </fieldset>
 
-            <fieldset>
-                <legend>Disclaimer</legend>
-                <div class="form-group">
-                    <label for="disclaimer_heading">Disclaimer Heading:</label>
-                    <input type="text" id="disclaimer_heading" name="disclaimer_heading" value="{{ form_data.disclaimer_heading }}" required>
-                </div>
-                <div class="form-group">
-                    <label for="disclaimer">Disclaimer Text:</label>
-                    <textarea id="disclaimer" name="disclaimer" rows="5" required>{{ form_data.disclaimer }}</textarea>
-                </div>
-            </fieldset>
+        <fieldset>
+            <legend>Disclaimer</legend>
+            <div class="form-group">
+                <label for="disclaimer_heading">Disclaimer Heading:</label>
+                <input type="text" id="disclaimer_heading" name="disclaimer_heading" value="{{ form_data.disclaimer_heading }}" required>
+            </div>
+            <div class="form-group">
+                <label for="disclaimer">Disclaimer Text:</label>
+                <textarea id="disclaimer" name="disclaimer" rows="5" required>{{ form_data.disclaimer }}</textarea>
+            </div>
+        </fieldset>
 
-            <button type="submit">Generate Report PDF</button>
-        </form>
-    </div>
-</body>
-</html>
+        <button type="submit">Generate Report PDF</button>
+    </form>
+{% endblock content %}

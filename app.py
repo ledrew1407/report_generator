@@ -1,9 +1,17 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, redirect, url_for, flash
 from datetime import datetime
 import os
 import io
 
-# Import reportlab components
+# Import security components
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
+from flask_bcrypt import Bcrypt # For password hashing
+from models import db, User # Import db and User from models.py
+from forms import RegistrationForm, LoginForm # Import forms
+from config import Config # Import configuration
+
+# Import reportlab components (your existing PDF logic)
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Image, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -13,13 +21,27 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus.flowables import KeepTogether
+from reportlab.lib.styles import ParagraphStyle
 
 app = Flask(__name__)
+app.config.from_object(Config) # Load config from Config class
 
-# --- Configuration (same as before) ---
+# Initialize extensions
+db.init_app(app)
+bcrypt = Bcrypt(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'login' # Where to redirect if login_required is used and user isn't logged in
+login_manager.login_message_category = 'info' # Category for flash message
+
+# --- Flask-Login user loader ---
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# --- Configuration for PDF generation (still separate) ---
 COMPANY_NAME = "Professional Inspection Services Inc."
-COMPANY_LOGO_PATH = "company_logo.png" # Must be in the same directory as app.py
-CUSTOM_FONT_PATH = "Roboto-Regular.ttf" # Must be in the same directory as app.py
+COMPANY_LOGO_PATH = "company_logo.png"
+CUSTOM_FONT_PATH = "Roboto-Regular.ttf"
 FONT_NAME_NORMAL = "Helvetica"
 FONT_NAME_BOLD = "Helvetica-Bold"
 FONT_NAME_CUSTOM = "Roboto"
@@ -29,18 +51,13 @@ try:
     if os.path.exists(CUSTOM_FONT_PATH):
         pdfmetrics.registerFont(TTFont(FONT_NAME_CUSTOM, CUSTOM_FONT_PATH))
         FONT_NAME_NORMAL = FONT_NAME_CUSTOM
-        # Ensure a bold variant is registered if using custom font
-        # For simplicity, if no explicit bold font file, reportlab often simulates bold
-        # If you have Roboto-Bold.ttf, register it like:
-        # pdfmetrics.registerFont(TTFont(FONT_NAME_CUSTOM + "-Bold", "Roboto-Bold.ttf"))
-        # FONT_NAME_BOLD = FONT_NAME_CUSTOM + "-Bold"
         print(f"Custom font '{CUSTOM_FONT_PATH}' registered successfully.")
     else:
         print(f"Warning: Custom font file '{CUSTOM_FONT_PATH}' not found. Using default fonts.")
 except Exception as e:
     print(f"Error registering custom font: {e}. Using default fonts.")
 
-# --- Page Template Handler for Headers/Footers/Page Numbers (same as before) ---
+# --- Page Template Handler for Headers/Footers/Page Numbers ---
 def _header_footer(canvas, doc):
     canvas.saveState()
     styles = getSampleStyleSheet()
@@ -74,7 +91,7 @@ def _header_footer(canvas, doc):
     canvas.restoreState()
 
 
-# --- PDF Generation Function ---
+# --- PDF Generation Function (same as previous revision) ---
 def generate_inspection_report_pdf(data):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
@@ -83,7 +100,7 @@ def generate_inspection_report_pdf(data):
 
     styles = getSampleStyleSheet()
 
-    # Define styles using the chosen fonts
+    # Define styles
     style_title = ParagraphStyle(
         'ReportTitle',
         parent=styles['h1'],
@@ -129,14 +146,13 @@ def generate_inspection_report_pdf(data):
         alignment=TA_CENTER,
         spaceBefore=0.2 * inch
     )
-
     story = []
 
     # --- Company Logo (if exists) ---
     if os.path.exists(COMPANY_LOGO_PATH):
         try:
-            logo = Image(COMPANY_LOGO_PATH, width=2.0 * inch, height=1.0 * inch) # Increased size slightly for better visibility
-            logo.hAlign = 'CENTER' # <--- Changed to CENTER
+            logo = Image(COMPANY_LOGO_PATH, width=2.0 * inch, height=1.0 * inch)
+            logo.hAlign = 'CENTER' # <--- Logo Centered
             story.append(logo)
             story.append(Spacer(1, 0.1 * inch))
         except Exception as e:
@@ -151,14 +167,14 @@ def generate_inspection_report_pdf(data):
     details_data = [
         [Paragraph(f"<b>Inspector:</b>", style_label), Paragraph(data.get('inspector_name', ''), style_body)],
         [Paragraph(f"<b>Inspector Address:</b>", style_label), Paragraph(data.get('inspector_address', ''), style_body)],
-        [Paragraph(f"<b>Adjuster Name:</b>", style_label), Paragraph(data.get('adjuster_name', ''), style_body)], # NEW
-        [Paragraph(f"<b>Adjuster Number:</b>", style_label), Paragraph(data.get('adjuster_number', ''), style_body)], # NEW
-        [Paragraph(f"<b>Adjuster Email:</b>", style_label), Paragraph(data.get('adjuster_email', ''), style_body)], # NEW
+        [Paragraph(f"<b>Adjuster Name:</b>", style_label), Paragraph(data.get('adjuster_name', ''), style_body)],
+        [Paragraph(f"<b>Adjuster Number:</b>", style_label), Paragraph(data.get('adjuster_number', ''), style_body)],
+        [Paragraph(f"<b>Adjuster Email:</b>", style_label), Paragraph(data.get('adjuster_email', ''), style_body)],
         [Paragraph(f"<b>Report Date:</b>", style_label), Paragraph(data.get('report_date', ''), style_body)],
         [Paragraph(f"<b>Claim Number:</b>", style_label), Paragraph(data.get('claim_number', ''), style_body)],
         [Paragraph(f"<b>Year Built:</b>", style_label), Paragraph(data.get('year_built', ''), style_body)],
     ]
-    details_table = Table(details_data, colWidths=[1.7 * inch, 4.3 * inch]) # Adjusted column width for new labels
+    details_table = Table(details_data, colWidths=[1.7 * inch, 4.3 * inch])
     details_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -244,16 +260,63 @@ def generate_inspection_report_pdf(data):
     return buffer
 
 # --- Flask Routes ---
-@app.route('/', methods=['GET', 'POST'])
-def index():
+
+# Home route - accessible to all
+@app.route('/')
+@app.route('/home')
+def home():
+    return render_template('home.html', title='Home') # New simple home page
+
+# Registration route
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('generate_report_form')) # If logged in, go to form
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
+        user = User(username=form.username.data, email=form.email.data, password_hash=hashed_password)
+        db.session.add(user)
+        db.session.commit()
+        flash('Your account has been created! You are now able to log in', 'success')
+        return redirect(url_for('login'))
+    return render_template('register.html', title='Register', form=form)
+
+# Login route
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('generate_report_form'))
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user and bcrypt.check_password_hash(user.password_hash, form.password.data):
+            login_user(user, remember=form.remember.data)
+            next_page = request.args.get('next')
+            return redirect(next_page) if next_page else redirect(url_for('generate_report_form'))
+        else:
+            flash('Login Unsuccessful. Please check email and password', 'danger')
+    return render_template('login.html', title='Login', form=form)
+
+# Logout route
+@app.route('/logout')
+@login_required # Requires login to log out
+def logout():
+    logout_user()
+    return redirect(url_for('home'))
+
+# Main report generation form - requires login
+@app.route('/generate_report', methods=['GET', 'POST'])
+@login_required # <--- THIS ROUTE IS NOW PROTECTED
+def generate_report_form():
     if request.method == 'POST':
         form_data = {
             'report_title': request.form.get('report_title', 'Inspection Report'),
             'inspector_name': request.form.get('inspector_name', ''),
             'inspector_address': request.form.get('inspector_address', ''),
-            'adjuster_name': request.form.get('adjuster_name', ''), # NEW
-            'adjuster_number': request.form.get('adjuster_number', ''), # NEW
-            'adjuster_email': request.form.get('adjuster_email', ''), # NEW
+            'adjuster_name': request.form.get('adjuster_name', ''),
+            'adjuster_number': request.form.get('adjuster_number', ''),
+            'adjuster_email': request.form.get('adjuster_email', ''),
             'report_date': request.form.get('report_date', ''),
             'claim_number': request.form.get('claim_number', ''),
             'year_built': request.form.get('year_built', ''),
@@ -279,21 +342,26 @@ def index():
                                  download_name=f"Inspection_Report_{form_data['claim_number'] or 'NoClaim'}.pdf")
             return response
         except Exception as e:
-            return render_template('index.html', error=f"Error generating PDF: {e}", form_data=form_data)
+            # When an error occurs, pass back the form_data so user doesn't lose input
+            flash(f"Error generating PDF: {e}", 'danger')
+            return render_template('index.html', form_data=form_data)
 
     # Pre-fill *all* fields with initial default values for GET requests
+    # Current date in MDT (Calgary) format
+    current_date_mdt = datetime.now().strftime("%B %d, %Y")
+
     default_data = {
-        'report_title': "Property Inspection Report", # Updated default title
+        'report_title': "Property Inspection Report",
         'inspector_name': "John Doe",
-        'inspector_address': "123 Inspection Lane, Suite 456, Calgary, AB T1X 2Y3",
-        'adjuster_name': "Jane Smith", # NEW
-        'adjuster_number': "555-123-4567", # NEW
-        'adjuster_email': "jane.smith@example.com", # NEW
-        'report_date': datetime.now().strftime("%B %d, %Y"), # Current date
+        'inspector_address': "123 Inspection Lane, Suite 456, Calgary, AB T2Y 3X4",
+        'adjuster_name': "Jane Smith",
+        'adjuster_number': "555-123-4567",
+        'adjuster_email': "jane.smith@example.com",
+        'report_date': current_date_mdt,
         'claim_number': "CLM-2025-06-001",
         'year_built': "2005",
         'cause_of_loss_heading': "Cause of Loss",
-        'cause_of_loss': "High winds caused a large tree branch to fall onto the roof, puncturing the shingles and underlying sheathing. The incident occurred during a severe thunderstorm on June 25, 2025.",
+        'cause_of_loss': "High winds caused a large tree branch to fall onto the roof, puncturing the shingles and underlying sheathing. The incident occurred during a severe thunderstorm.",
         'resulting_damages_heading': "Resulting Damages",
         'resulting_damages': "Significant damage to the roof structure, including compromised trusses and water infiltration into the attic space. Partial ceiling collapse in the master bedroom due to water saturation. Damage to drywall, insulation, and some personal belongings in the affected area. Minor water staining observed on walls in adjacent rooms.",
         'scope_of_work_heading': "Scope of Work",
@@ -312,7 +380,26 @@ def index():
             "contained herein and consult with appropriate professionals before making decisions."
         )
     }
+    # Pass current_user to template for conditional display of links
     return render_template('index.html', form_data=default_data)
+
+# Context processor to make current_user available in all templates
+@app.context_processor
+def inject_current_user():
+    return dict(current_user=current_user)
+
+# --- Database Initialization on First Run ---
+with app.app_context():
+    db.create_all() # Creates tables based on models.py if they don't exist
+    # Optional: Create a default admin user on first run if no users exist
+    if User.query.count() == 0:
+        print("No users found. Creating a default admin user.")
+        hashed_password = bcrypt.generate_password_hash('adminpass').decode('utf-8')
+        admin_user = User(username='admin', email='admin@example.com', password_hash=hashed_password)
+        db.session.add(admin_user)
+        db.session.commit()
+        print("Default admin user 'admin' (password: adminpass) created.")
+
 
 if __name__ == '__main__':
     os.makedirs('templates', exist_ok=True)
@@ -325,7 +412,9 @@ if __name__ == '__main__':
 
     print("\n-----------------------------------------------------------")
     print("Flask app will run on http://127.0.0.1:5000/")
-    print("Open this URL in your web browser.")
+    print("To register: http://127.0.0.1:5000/register")
+    print("To login: http://127.0.0.1:5000/login")
+    print("Default admin user (if created): admin / adminpass")
     print("Press Ctrl+C to stop the server.")
     print("-----------------------------------------------------------\n")
     app.run(host="0.0.0.0", port=7000, debug=True)

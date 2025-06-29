@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>Welcome to the Inspection Report Generator</h1>
+    <p>Please use the navigation above to register, log in, or generate a report.</p>
+    {% if not current_user.is_authenticated %}
+        <p>You need to <a href="{{ url_for('register') }}">Register</a> or <a href="{{ url_for('login') }}">Login</a> to access the report generation form.</p>
+    {% endif %}
+{% endblock content %}
