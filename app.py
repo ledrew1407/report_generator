@@ -74,13 +74,11 @@ def _header_footer(canvas, doc):
     canvas.restoreState()
 
 
-# --- PDF Generation Function (NOW PURELY RELIES ON `data` DICT) ---
+# --- PDF Generation Function ---
 def generate_inspection_report_pdf(data):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
-    
-    # Use .get() with an empty string default for robustness,
-    # in case a field somehow comes back empty from the form.
+
     doc.title = f"Claim #{data.get('claim_number', 'N/A')}"
 
     styles = getSampleStyleSheet()
@@ -137,8 +135,8 @@ def generate_inspection_report_pdf(data):
     # --- Company Logo (if exists) ---
     if os.path.exists(COMPANY_LOGO_PATH):
         try:
-            logo = Image(COMPANY_LOGO_PATH, width=1.5 * inch, height=0.75 * inch)
-            logo.hAlign = 'RIGHT'
+            logo = Image(COMPANY_LOGO_PATH, width=2.0 * inch, height=1.0 * inch) # Increased size slightly for better visibility
+            logo.hAlign = 'CENTER' # <--- Changed to CENTER
             story.append(logo)
             story.append(Spacer(1, 0.1 * inch))
         except Exception as e:
@@ -146,20 +144,21 @@ def generate_inspection_report_pdf(data):
             print(f"Error loading company logo: {e}")
 
     # --- Report Title ---
-    # The actual title will come from the form, but "Inspection Report" itself is a fixed heading.
-    # If you want to change "Inspection Report" title itself, add a field for it in the form.
     story.append(Paragraph(data.get('report_title', 'Inspection Report'), style_title))
     story.append(Spacer(1, 0.2 * inch))
 
     # --- Inspection Details Table ---
     details_data = [
         [Paragraph(f"<b>Inspector:</b>", style_label), Paragraph(data.get('inspector_name', ''), style_body)],
-        [Paragraph(f"<b>Address:</b>", style_label), Paragraph(data.get('inspector_address', ''), style_body)],
+        [Paragraph(f"<b>Inspector Address:</b>", style_label), Paragraph(data.get('inspector_address', ''), style_body)],
+        [Paragraph(f"<b>Adjuster Name:</b>", style_label), Paragraph(data.get('adjuster_name', ''), style_body)], # NEW
+        [Paragraph(f"<b>Adjuster Number:</b>", style_label), Paragraph(data.get('adjuster_number', ''), style_body)], # NEW
+        [Paragraph(f"<b>Adjuster Email:</b>", style_label), Paragraph(data.get('adjuster_email', ''), style_body)], # NEW
         [Paragraph(f"<b>Report Date:</b>", style_label), Paragraph(data.get('report_date', ''), style_body)],
         [Paragraph(f"<b>Claim Number:</b>", style_label), Paragraph(data.get('claim_number', ''), style_body)],
         [Paragraph(f"<b>Year Built:</b>", style_label), Paragraph(data.get('year_built', ''), style_body)],
     ]
-    details_table = Table(details_data, colWidths=[1.5 * inch, 4.5 * inch])
+    details_table = Table(details_data, colWidths=[1.7 * inch, 4.3 * inch]) # Adjusted column width for new labels
     details_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -248,12 +247,13 @@ def generate_inspection_report_pdf(data):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        # Collect ALL form data using request.form.get() with empty string default
-        # to ensure all keys are present, even if empty.
         form_data = {
             'report_title': request.form.get('report_title', 'Inspection Report'),
             'inspector_name': request.form.get('inspector_name', ''),
             'inspector_address': request.form.get('inspector_address', ''),
+            'adjuster_name': request.form.get('adjuster_name', ''), # NEW
+            'adjuster_number': request.form.get('adjuster_number', ''), # NEW
+            'adjuster_email': request.form.get('adjuster_email', ''), # NEW
             'report_date': request.form.get('report_date', ''),
             'claim_number': request.form.get('claim_number', ''),
             'year_built': request.form.get('year_built', ''),
@@ -266,7 +266,7 @@ def index():
             'recommendations_heading': request.form.get('recommendations_heading', 'Recommendations'),
             'recommendations': request.form.get('recommendations', ''),
             'reserves_heading': request.form.get('reserves_heading', 'Estimated Reserves'),
-            'reserves_input': request.form.get('reserves_input', ''), # Raw text from textarea
+            'reserves_input': request.form.get('reserves_input', ''),
             'disclaimer_heading': request.form.get('disclaimer_heading', 'Disclaimer'),
             'disclaimer': request.form.get('disclaimer', '')
         }
@@ -279,15 +279,17 @@ def index():
                                  download_name=f"Inspection_Report_{form_data['claim_number'] or 'NoClaim'}.pdf")
             return response
         except Exception as e:
-            # Pass original form_data back to pre-fill the form in case of error
             return render_template('index.html', error=f"Error generating PDF: {e}", form_data=form_data)
 
     # Pre-fill *all* fields with initial default values for GET requests
     default_data = {
-        'report_title': "Inspection Report",
+        'report_title': "Property Inspection Report", # Updated default title
         'inspector_name': "John Doe",
         'inspector_address': "123 Inspection Lane, Suite 456, Calgary, AB T1X 2Y3",
-        'report_date': datetime.now().strftime("%B %d, %Y"),
+        'adjuster_name': "Jane Smith", # NEW
+        'adjuster_number': "555-123-4567", # NEW
+        'adjuster_email': "jane.smith@example.com", # NEW
+        'report_date': datetime.now().strftime("%B %d, %Y"), # Current date
         'claim_number': "CLM-2025-06-001",
         'year_built': "2005",
         'cause_of_loss_heading': "Cause of Loss",
